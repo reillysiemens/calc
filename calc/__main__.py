@@ -1,5 +1,6 @@
 import argparse
 import calc
+from calc.interpreter import Interpreter, ParserError
 
 
 def main():
@@ -13,9 +14,18 @@ def main():
             text = input('calc> ')
         except EOFError:
             break
+
         if not text:
             continue
-        print(text)
+
+        interpreter = Interpreter(text)
+
+        try:
+            result = interpreter.parse()
+            print(result)
+        except ParserError as error:
+            print(error)
+
 
 if __name__ == '__main__':
     main()
