@@ -1,4 +1,4 @@
-# Calc
+# Calc [![Build Status](https://travis-ci.org/reillysiemens/calc.svg?branch=testing)](https://travis-ci.org/reillysiemens/calc)
 
 A **very** simple calculator designed to teach software testing.
 
