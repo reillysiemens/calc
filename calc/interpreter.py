@@ -1,5 +1,5 @@
 # EOF (end-of-file) indicates no more input for lexical analysis.
-INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
+INTEGER, PLUS, MINUS, EOF = 'INTEGER', 'PLUS', 'MINUS', 'EOF'
 
 
 class ParserError(Exception):
@@ -12,9 +12,9 @@ class Token:
 
     Attributes:
         kind (str): The kind, or type, of the token. Valid kinds are currently
-            ``INTEGER``, ``PLUS``, and ``EOF``.
+            ``INTEGER``, ``PLUS``, ``MINUS``, and ``EOF``.
         value (str): The value of the token. Valid values are currently
-            integers 0-9, +, or None.
+            non-negative integers, ``+``, ``-``, or ``None``.
     """
 
     def __init__(self, kind, value):
@@ -43,12 +43,14 @@ class Interpreter:
         text (str): The input string, e.g. ``'3+5'``.
         pos (int): An index into ``text`` indicating the intepreter's position.
         current_token (Token): The current ``Token`` instance.
+        current_char (str): The character in ``text`` indexed by ``pos``.
     """
 
     def __init__(self, text):
         self.text = text
         self.pos = 0
         self.current_token = None
+        self.current_char = self.text[self.pos] if self.text else None
 
     def __repr__(self):
         """The unambiguous string representation of an ``Interpreter``."""
@@ -59,7 +61,38 @@ class Interpreter:
             current_token=repr(self.current_token)
         )
 
-    def get_next_token(self):
+    def _advance(self):
+        """Advance the ``pos`` index and set the ``current_char`` variable."""
+
+        self.pos += 1
+        if self.pos > len(self.text) - 1:
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos]
+
+    def _skip_whitespace(self):
+        """Ignore whitespace in ``text``."""
+
+        while self.current_char is not None and self.current_char.isspace():
+            self._advance()
+
+    def _integer(self):
+        """Consume a integer from ``text``.
+
+        Note:
+            Handles single and multidigit integers.
+
+        Returns:
+            result (int): The integer value of a contiguous set of digits.
+        """
+
+        result = []
+        while self.current_char is not None and self.current_char.isdigit():
+            result.append(self.current_char)
+            self._advance()
+        return int(''.join(result))
+
+    def _get_next_token(self):
         """Tokenize the next token in the input string.
 
         Returns:
@@ -70,31 +103,39 @@ class Interpreter:
                 the invalid token is also given by this ``ParserError``.
         """
 
-        # Is self.pos past the end of self.text? If so, then return EOF, because
-        # there is no more input to tokenize.
-        if self.pos > len(self.text) - 1:
-            return Token(EOF, None)
+        while self.current_char is not None:
 
-        # Get the current character at the self.pos index in self.text.
-        current_char = self.text[self.pos]
+            # If the current character is a space, then ignore it and any
+            # additional spaces until the next token of consequence.
+            if self.current_char.isspace():
+                self._skip_whitespace()
+                continue
 
-        # If the character is a digit, then convert it to an integer, create an
-        # INTEGER token, increment self.pos, and return the INTEGER token.
-        if current_char.isdigit():
-            token = Token(INTEGER, int(current_char))
-            self.pos += 1
-            return token
+            # If the current character is a digit, then convert it to an
+            # integer, create an INTEGER token, advance self.pos, and return the
+            # INTEGER token.
+            if self.current_char.isdigit():
+                return Token(INTEGER, self._integer())
 
-        # If the character is a + operator, then create a PLUS token, increment
-        # self.pos, and return the PLUS token.
-        if current_char == '+':
-            token = Token(PLUS, current_char)
-            self.pos += 1
-            return token
+            # If the current character is a + operator, then create a PLUS
+            # token, advance self.pos, and return the PLUS token.
+            if self.current_char == '+':
+                self._advance()
+                return Token(PLUS, '+')
 
-        raise ParserError("Invalid token at position {pos}".format(
-            pos=self.pos
-        ))
+            # If the current character is a - operator, then create a MINUS
+            # token, advance self.pos, and return the MINUS token.
+            if self.current_char == '-':
+                self._advance()
+                return Token(MINUS, '-')
+
+            raise ParserError("Invalid token at position {pos}".format(
+                pos=self.pos
+            ))
+
+        # If the current character is None, then self.pos is beyond the end of
+        # self.text. We should return EOF, because nothing remains to tokenize.
+        return Token(EOF, None)
 
     def _consume(self, token_kind):
         """Consume the current token if its kind matches ``token_kind``.
@@ -109,7 +150,7 @@ class Interpreter:
         """
 
         if self.current_token.kind == token_kind:
-            self.current_token = self.get_next_token()
+            self.current_token = self._get_next_token()
         else:
             raise ParserError(("Expected {token_kind} at position {pos}, "
                                "found {current_token}").format(
@@ -120,24 +161,39 @@ class Interpreter:
     def parse(self):
         """Parse arithmetic expressions.
 
+        Note:
+            Valid expressions are currently of the form
+                INTEGER PLUS INTEGER
+            or
+                INTEGER MINUS INTEGER
+
         Returns:
             result (int): The result of evaluating the arithmetic expression.
         """
 
         # Get the first token.
-        self.current_token = self.get_next_token()
+        self.current_token = self._get_next_token()
 
-        # We expect the next token to be a single-digit integer.
+        # We expect the next token to be an integer.
         left = self.current_token
         self._consume(INTEGER)
 
-        # We expect the next token to be a '+' operator. Since we don't
-        # currently use the operator we simply consume the token and move on.
-        self._consume(PLUS)
+        # We expect the next token to be a + or - operator.
+        op = self.current_token
+        if op.kind == PLUS:
+            self._consume(PLUS)
+        else:
+            self._consume(MINUS)
 
-        # We expect the next token to be a single-digit integer.
+        # We expect the next token to be an integer.
         right = self.current_token
         self._consume(INTEGER)
 
-        result = left.value + right.value
+        # At this point we have successfully found a sequence of tokens
+        # representing either integer addition or integer subtraction and can
+        # perform the corresponding operation, thereby interpretting the input.
+        if op.kind == PLUS:
+            result = left.value + right.value
+        else:
+            result = left.value - right.value
         return result
