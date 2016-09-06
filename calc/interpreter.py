@@ -158,6 +158,17 @@ class Interpreter:
                                    pos=self.pos,
                                    current_token=self.current_token.kind))
 
+    def _term(self):
+        """Return the value of an ``INTEGER`` token.
+
+        Returns:
+            token.value (int): The value of the ``INTEGER`` token.
+        """
+
+        token = self.current_token
+        self._consume(INTEGER)
+        return token.value
+
     def parse(self):
         """Parse arithmetic expressions.
 
@@ -174,26 +185,18 @@ class Interpreter:
         # Get the first token.
         self.current_token = self._get_next_token()
 
-        # We expect the next token to be an integer.
-        left = self.current_token
-        self._consume(INTEGER)
+        # Get the first term.
+        result = self._term()
 
-        # We expect the next token to be a + or - operator.
-        op = self.current_token
-        if op.kind == PLUS:
-            self._consume(PLUS)
-        else:
-            self._consume(MINUS)
+        # As long as the next token is an operator consume it and then perform
+        # the corresponding operation on the next term.
+        while self.current_token.kind in (PLUS, MINUS):
+            token = self.current_token
+            if token.kind == PLUS:
+                self._consume(PLUS)
+                result = result + self._term()
+            elif token.kind == MINUS:
+                self._consume(MINUS)
+                result = result - self._term()
 
-        # We expect the next token to be an integer.
-        right = self.current_token
-        self._consume(INTEGER)
-
-        # At this point we have successfully found a sequence of tokens
-        # representing either integer addition or integer subtraction and can
-        # perform the corresponding operation, thereby interpretting the input.
-        if op.kind == PLUS:
-            result = left.value + right.value
-        else:
-            result = left.value - right.value
         return result

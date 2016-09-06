@@ -1,7 +1,6 @@
 import unittest
 
-from calc.interpreter import (INTEGER, PLUS, MINUS, EOF, Token, Interpreter,
-                              ParserError)
+from calc.interpreter import INTEGER, PLUS, Token, Interpreter, ParserError
 
 
 class TestInterpreter(unittest.TestCase):
@@ -14,6 +13,11 @@ class TestInterpreter(unittest.TestCase):
         interpreter = Interpreter('4 - 3')
         result = interpreter.parse()
         self.assertEqual(result, 1)
+
+    def test_multiple_operations(self):
+        interpreter = Interpreter('4 + 3 - 3')
+        result = interpreter.parse()
+        self.assertEqual(result, 4)
 
     def test_raises_parser_error_on_invalid_input(self):
         interpreter = Interpreter('a')
